@@ -1,0 +1,2096 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>潮汐·树洞</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234a5a52'/%3E%3Cpath d='M12 28c4 0 4 4 8 4s4-4 8-4 4 4 8 4 4-4 8-4 4 4 8 4M12 40c4 0 4 4 8 4s4-4 8-4 4 4 8 4 4-4 8-4 4 4 8 4' stroke='white' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg-top: #3a4a44;
+    --bg-mid: #5a6b62;
+    --bg-warm: #8a8272;
+    --bg-deep: #2a3632;
+    --text: #f2f0ea;
+    --text-secondary: rgba(242,240,234,0.55);
+    --text-faint: rgba(242,240,234,0.35);
+    --accent: #ffffff;
+    --accent-soft: rgba(255,255,255,0.85);
+    --glass: rgba(255,255,255,0.10);
+    --glass-strong: rgba(255,255,255,0.16);
+    --glass-border: rgba(255,255,255,0.18);
+    --card-solid: #2f3a36;
+    --radius: 22px;
+    --tab-height: 72px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', 'Noto Sans SC', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+  .app {
+    max-width: 430px;
+    margin: 0 auto;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 120% 60% at 50% 0%, rgba(255,255,255,0.08) 0%, transparent 60%),
+      linear-gradient(180deg, #4a5a52 0%, #6b7a6f 35%, #9a9080 70%, #6b6558 100%);
+  }
+  .app::before {
+    content:'';
+    position:absolute;
+    top:-10%; left:-20%;
+    width:140%; height:60%;
+    background: radial-gradient(ellipse at center, rgba(210,220,200,0.15) 0%, transparent 70%);
+    pointer-events:none;
+    z-index:0;
+  }
+  .screen {
+    display: none;
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    bottom: var(--tab-height);
+    overflow-y: auto;
+    padding: 24px 22px 30px;
+    scroll-behavior: smooth;
+    animation: fadeIn .4s ease;
+    z-index: 1;
+  }
+  .screen.active { display: block; }
+  .sub-screen {
+    display: none;
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    bottom: 0;
+    overflow-y: auto;
+    padding: 24px 22px;
+    z-index: 50;
+    background: linear-gradient(180deg, #3a4a44 0%, #5a6b62 50%, #4a5a52 100%);
+    animation: slideUp .4s ease;
+  }
+  .sub-screen.active { display: block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+  @keyframes breathe { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.06);opacity:1} }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  @keyframes ripple { 0%{box-shadow:0 0 0 0 rgba(255,255,255,.3)} 100%{box-shadow:0 0 0 20px rgba(255,255,255,0)} }
+  .screen::-webkit-scrollbar, .sub-screen::-webkit-scrollbar { width:3px; }
+  .screen::-webkit-scrollbar-thumb, .sub-screen::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); border-radius:9px; }
+
+  /* ===== 顶部问候区 ===== */
+  .top-bar {
+    display:flex; align-items:flex-start; justify-content:space-between;
+    margin-bottom: 28px;
+  }
+  .greeting { font-size: 32px; font-weight: 600; letter-spacing: 1px; }
+  .sub-greeting { font-size: 14px; color: var(--text-secondary); margin-top: 6px; }
+  .top-actions { display:flex; gap:10px; align-items:center; }
+  .top-round-btn {
+    width:42px; height:42px;
+    border-radius:50%;
+    background: var(--glass);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .top-round-btn svg { width:20px; height:20px; stroke:var(--text); fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .avatar-round {
+    width:44px; height:44px;
+    border-radius:50%;
+    background: var(--glass-strong);
+    border: 1px solid var(--glass-border);
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  .avatar-round svg { width:22px; height:22px; stroke:var(--text); fill:none; stroke-width:1.8; }
+
+  /* ===== Bottom Tab ===== */
+  .tab-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: var(--tab-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    background: rgba(40,50,46,0.55);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid rgba(255,255,255,0.10);
+    z-index: 100;
+  }
+  .tab-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    padding: 10px 0;
+    transition: .2s;
+    user-select: none;
+  }
+  .tab-item svg { width:24px; height:24px; fill:none; stroke:var(--text-secondary); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; transition:.2s; }
+  .tab-item span { font-size:11px; color:var(--text-secondary); transition:.2s; }
+  .tab-item.active svg { stroke:var(--accent); }
+  .tab-item.active span { color:var(--accent); }
+
+  /* ===== Glass Card ===== */
+  .glass-card {
+    background: var(--glass);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+
+  /* ===== Mood Slider ===== */
+  .mood-section { margin-bottom: 28px; }
+  .mood-section h3 { font-size:13px; color:var(--text-secondary); margin-bottom:16px; font-weight:500; letter-spacing:0.5px; }
+  .mood-track-wrapper { position:relative; padding:14px 0; }
+  .mood-track {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #e8c97a, #a8c9a0, #9ab0c4, #c4a8c0, #d4a090, #b08080);
+    position: relative;
+    cursor: pointer;
+  }
+  .mood-thumb {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: #fff;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 2px 12px rgba(0,0,0,.25), 0 0 20px rgba(255,255,255,.4);
+    transition: box-shadow .3s;
+    cursor: grab;
+    z-index: 2;
+  }
+  .mood-thumb:active { cursor:grabbing; }
+  .mood-label {
+    text-align: center;
+    margin-top: 14px;
+    font-size: 15px;
+    font-weight: 500;
+    transition: color .3s;
+  }
+  .mood-bottle-preview {
+    width: 56px; height: 76px;
+    margin: 0 auto 12px;
+    border-radius: 28px 28px 18px 18px;
+    background: rgba(255,255,255,0.35);
+    position: relative;
+    animation: breathe 3.5s ease-in-out infinite;
+    transition: background .3s;
+  }
+  .mood-bottle-preview::before {
+    content:'';
+    position:absolute;
+    top:-12px; left:50%;
+    transform:translateX(-50%);
+    width:18px; height:14px;
+    border-radius:4px 4px 0 0;
+    background:inherit;
+    opacity:.7;
+  }
+  .mood-bottle-preview::after {
+    content:'';
+    position:absolute;
+    top:12px; left:14px;
+    width:12px; height:18px;
+    border-radius:50%;
+    background:rgba(255,255,255,.3);
+  }
+
+  /* ===== Meditation Grid ===== */
+  .section-title {
+    font-size:15px; font-weight:600; margin-bottom:14px;
+    display:flex; align-items:center; gap:8px;
+    color: var(--text);
+  }
+  .section-title svg { width:16px; height:16px; stroke:var(--text-secondary); fill:none; stroke-width:2; stroke-linecap:round; }
+  .med-scroll {
+    display:flex; gap:12px;
+    overflow-x:auto;
+    margin-bottom:24px;
+    padding-bottom:4px;
+    scrollbar-width:none;
+  }
+  .med-scroll::-webkit-scrollbar { display:none; }
+  .med-card {
+    flex: 0 0 150px;
+    background: var(--glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 22px 16px 18px;
+    cursor: pointer;
+    transition: .25s;
+  }
+  .med-card:active { transform:scale(0.97); background:var(--glass-strong); }
+  .med-card .icon-wrap {
+    width:38px; height:38px;
+    margin-bottom:14px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .med-card .icon-wrap svg {
+    width:30px; height:30px;
+    stroke:var(--text); fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round;
+  }
+  .med-card .name { font-size:14px; color:var(--text); font-weight:500; }
+  .med-card .desc { font-size:11px; color:var(--text-secondary); margin-top:4px; line-height:1.4; }
+
+  /* ===== Recommended Audio ===== */
+  .audio-card {
+    display:flex; align-items:center; gap:14px;
+    padding:14px; cursor:pointer;
+    border-radius:18px;
+    background: var(--glass);
+    border:1px solid var(--glass-border);
+    margin-bottom:10px;
+    transition:.2s;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .audio-card:active { background:var(--glass-strong); }
+  .audio-play-btn {
+    width:40px; height:40px;
+    border-radius:50%;
+    background:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .audio-play-btn svg { width:16px; height:16px; fill:#3a4a44; stroke:none; margin-left:2px; }
+  .audio-info { flex:1; min-width:0; }
+  .audio-info .title { font-size:14px; font-weight:500; }
+  .audio-info .dur { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+
+  /* ===== Consulting Float Button ===== */
+  .consult-float {
+    position:absolute;
+    bottom:90px; right:20px;
+    width:54px; height:54px;
+    border-radius:50%;
+    background: var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    box-shadow:0 6px 24px rgba(0,0,0,.25);
+    z-index:10;
+    animation: ripple 2.5s ease infinite;
+    transition:.2s;
+  }
+  .consult-float:active { transform:scale(1.08); }
+  .consult-float svg { width:24px; height:24px; stroke:#3a4a44; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+
+  /* ===== Bottle Home ===== */
+  .bottle-ocean {
+    position:relative;
+    height:280px;
+    background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,.05) 60%, rgba(255,255,255,.10) 100%);
+    border-radius: var(--radius);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:30px;
+    margin-bottom:22px;
+    overflow:hidden;
+    border:1px solid var(--glass-border);
+  }
+  .bottle-ocean::before {
+    content:'';
+    position:absolute;
+    bottom:0;left:0;right:0;
+    height:50%;
+    background: linear-gradient(180deg, transparent, rgba(255,255,255,.08));
+    border-radius: 0 0 var(--radius) var(--radius);
+  }
+  .ocean-wave {
+    position:absolute;
+    bottom:0;left:-50%;right:-50%;
+    height:40px;
+    background:rgba(255,255,255,.06);
+    border-radius:50%;
+    animation: waveMove 5s ease-in-out infinite;
+  }
+  @keyframes waveMove { 0%,100%{transform:translateX(0)} 50%{transform:translateX(20px)} }
+  .bottle-action-btn {
+    z-index:2;
+    width:120px;
+    padding:18px 0;
+    text-align:center;
+    border-radius:22px;
+    cursor:pointer;
+    transition:.2s;
+    user-select:none;
+    border:1px solid var(--glass-border);
+  }
+  .bottle-action-btn:active { transform:translateY(-2px); }
+  .btn-write { background:rgba(255,255,255,0.18); color:var(--text); backdrop-filter:blur(10px); }
+  .btn-pick { background:var(--accent); color:#3a4a44; border:none; font-weight:600; }
+  .bottle-action-btn .btn-icon {
+    display:flex; justify-content:center; margin-bottom:8px;
+  }
+  .bottle-action-btn .btn-icon svg { width:28px; height:28px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .bottle-action-btn .btn-text { font-size:13px; font-weight:500; }
+
+  /* ===== Recent Posts ===== */
+  .recent-item {
+    display:flex; align-items:center; gap:12px;
+    padding:14px; border-radius:16px;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    margin-bottom:10px;
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+  }
+  .recent-dot {
+    width:10px; height:10px;
+    border-radius:50%;
+    flex-shrink:0;
+  }
+  .recent-text { font-size:13px; color:var(--text); flex:1; line-height:1.5; }
+  .recent-time { font-size:11px; color:var(--text-faint); flex-shrink:0; }
+
+  /* ===== Write Bottle Steps ===== */
+  .step-indicator {
+    display:flex; gap:8px; margin-bottom:24px;
+  }
+  .step-dot {
+    width:8px; height:8px; border-radius:50%;
+    background:rgba(255,255,255,.2);
+    transition:.3s;
+  }
+  .step-dot.active { background:var(--accent); width:26px; border-radius:4px; }
+  .write-area {
+    width:100%;
+    min-height:160px;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    border-radius:18px;
+    padding:16px;
+    color:var(--text);
+    font-size:15px;
+    line-height:1.7;
+    resize:none;
+    outline:none;
+    font-family:inherit;
+  }
+  .write-area::placeholder { color:var(--text-faint); }
+  .char-count { text-align:right; font-size:12px; color:var(--text-secondary); margin-top:6px; }
+  .visibility-options {
+    display:flex; gap:12px; margin:18px 0;
+  }
+  .vis-opt {
+    flex:1;
+    padding:18px 14px;
+    border-radius:18px;
+    text-align:center;
+    background:var(--glass);
+    border:2px solid transparent;
+    cursor:pointer;
+    transition:.2s;
+    font-size:14px;
+  }
+  .vis-opt.selected { border-color:var(--accent); background:var(--glass-strong); }
+  .vis-opt .vis-icon {
+    display:flex; justify-content:center; margin-bottom:10px;
+  }
+  .vis-opt .vis-icon svg { width:28px; height:28px; stroke:var(--text); fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .dest-options {
+    display:flex; gap:10px; flex-wrap:wrap; margin:18px 0;
+  }
+  .dest-btn {
+    flex:1;
+    min-width:90px;
+    padding:14px 10px;
+    border-radius:16px;
+    text-align:center;
+    font-size:13px;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    cursor:pointer;
+    transition:.2s;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .dest-btn svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .dest-btn:active { background:var(--glass-strong); }
+  .dest-btn.primary { background:var(--accent); color:#3a4a44; border-color:var(--accent); font-weight:600; }
+  .dest-btn.primary svg { stroke:#3a4a44; }
+
+  /* ===== Picked Bottle ===== */
+  .picked-bottle-card {
+    text-align:center;
+    padding:34px 22px;
+    border-radius:24px;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    margin-bottom:22px;
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+  }
+  .picked-bottle-vis {
+    width:70px; height:100px;
+    border-radius:35px 35px 22px 22px;
+    margin:0 auto 18px;
+    animation: float 3.5s ease-in-out infinite;
+    position:relative;
+    background:rgba(255,255,255,0.35);
+  }
+  .picked-bottle-vis::before {
+    content:'';position:absolute;
+    top:-14px;left:50%;transform:translateX(-50%);
+    width:22px;height:16px;
+    border-radius:5px 5px 0 0;
+    background:inherit; opacity:.7;
+  }
+  .picked-bottle-vis::after {
+    content:'';position:absolute;
+    top:16px;left:16px;
+    width:16px;height:24px;
+    border-radius:50%;
+    background:rgba(255,255,255,.25);
+  }
+  .picked-nickname { font-size:13px; color:var(--text-secondary); margin-bottom:10px; }
+  .picked-content { font-size:16px; line-height:1.8; margin-bottom:14px; }
+  .picked-hugs {
+    font-size:13px; color:var(--text-secondary);
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .picked-hugs svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7; }
+
+  /* ===== Comment Section ===== */
+  .section-divider {
+    display:flex; align-items:center; gap:10px; margin:24px 0 16px;
+  }
+  .section-divider::before, .section-divider::after {
+    content:''; flex:1; height:1px; background:rgba(255,255,255,0.12);
+  }
+  .section-divider span {
+    font-size:13px; color:var(--text-secondary); white-space:nowrap;
+    display:flex; align-items:center; gap:6px;
+  }
+  .section-divider svg { width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:1.8; }
+  .comment-item {
+    display:flex; gap:10px; margin-bottom:16px;
+  }
+  .comment-avatar {
+    width:34px; height:34px; border-radius:50%;
+    flex-shrink:0;
+    background:rgba(255,255,255,0.25);
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; color:var(--text); font-weight:500;
+  }
+  .comment-body { flex:1; }
+  .comment-name { font-size:12px; color:var(--text-secondary); margin-bottom:3px; }
+  .comment-text { font-size:14px; line-height:1.6; }
+  .volunteer-reply-card {
+    background: rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.15);
+    border-radius:20px;
+    padding:20px;
+    margin-top:12px;
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+  }
+  .volunteer-badge {
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,0.15);
+    padding:5px 12px;
+    border-radius:10px;
+    font-size:11px;
+    color:var(--text);
+    margin-bottom:12px;
+  }
+  .volunteer-badge svg { width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:2; }
+  .volunteer-reply-text {
+    font-size:15px;
+    line-height:1.8;
+    color:var(--text);
+  }
+  .no-reply-hint { font-size:13px; color:var(--text-secondary); text-align:center; padding:20px; }
+
+  /* ===== Action Buttons ===== */
+  .action-bar {
+    display:flex; gap:10px; margin-top:20px;
+  }
+  .action-btn {
+    flex:1;
+    padding:14px 8px;
+    border-radius:18px;
+    text-align:center;
+    font-size:13px;
+    cursor:pointer;
+    transition:.2s;
+    border:1px solid var(--glass-border);
+    font-family:inherit;
+    user-select:none;
+    display:flex; align-items:center; justify-content:center; gap:5px;
+  }
+  .action-btn svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .action-btn:active { transform:translateY(-1px); }
+  .btn-hug { background:rgba(255,255,255,0.12); color:var(--text); }
+  .btn-hug.hugged { background:rgba(255,255,255,0.28); }
+  .btn-comment { background:rgba(255,255,255,0.12); color:var(--text); }
+  .btn-release { background:transparent; color:var(--text-secondary); }
+
+  /* ===== Comment Input ===== */
+  .comment-input-wrap {
+    display:none;
+    margin-top:14px;
+    position:relative;
+  }
+  .comment-input-wrap.show { display:block; }
+  .comment-input {
+    width:100%;
+    padding:14px 70px 14px 16px;
+    border-radius:16px;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    color:var(--text);
+    font-size:14px;
+    outline:none;
+    font-family:inherit;
+  }
+  .comment-input::placeholder { color:var(--text-faint); }
+  .comment-submit {
+    position:absolute;
+    right:8px; top:50%; transform:translateY(-50%);
+    padding:8px 16px;
+    border-radius:12px;
+    background:var(--accent);
+    color:#3a4a44;
+    font-size:12px;
+    cursor:pointer;
+    border:none;
+    font-family:inherit;
+    font-weight:600;
+  }
+
+  /* ===== Cabinet ===== */
+  .cabinet-tabs {
+    display:flex; gap:0; margin-bottom:18px;
+    background:var(--glass);
+    border-radius:16px;
+    overflow:hidden;
+    border:1px solid var(--glass-border);
+    padding:4px;
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+  }
+  .cab-tab {
+    flex:1;
+    padding:10px;
+    text-align:center;
+    font-size:13px;
+    cursor:pointer;
+    transition:.2s;
+    color:var(--text-secondary);
+    border-radius:12px;
+  }
+  .cab-tab.active { background:var(--accent); color:#3a4a44; font-weight:600; }
+  .cabinet-item {
+    padding:16px;
+    border-radius:18px;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    margin-bottom:12px;
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+  }
+  .cabinet-item .cab-content { font-size:14px; line-height:1.7; margin-bottom:8px; }
+  .cabinet-item .cab-meta { font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .cabinet-item .cab-meta span { display:inline-flex; align-items:center; gap:4px; }
+  .cabinet-item .cab-meta svg { width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:1.8; }
+
+  /* ===== Mine ===== */
+  .profile-header {
+    display:flex; align-items:center; gap:16px; margin-bottom:28px;
+  }
+  .avatar {
+    width:64px; height:64px;
+    border-radius:50%;
+    background:var(--glass-strong);
+    border:1px solid var(--glass-border);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .avatar svg { width:30px; height:30px; stroke:var(--text); fill:none; stroke-width:1.6; }
+  .profile-name { font-size:20px; font-weight:600; }
+  .profile-id { font-size:12px; color:var(--text-secondary); margin-top:3px; }
+  .mine-menu-item {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px;
+    border-radius:18px;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    margin-bottom:10px;
+    cursor:pointer;
+    transition:.2s;
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+  }
+  .mine-menu-item:active { background:var(--glass-strong); }
+  .mine-menu-item .label { font-size:14px; display:flex; align-items:center; gap:12px; }
+  .mine-menu-item .label svg { width:20px; height:20px; stroke:var(--text); fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .mine-menu-item .arrow { color:var(--text-secondary); display:flex; }
+  .mine-menu-item .arrow svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .mine-badge {
+    display:inline-block;
+    background:rgba(255,120,120,0.25);
+    color:#ffb0b0;
+    font-size:11px;
+    padding:3px 9px;
+    border-radius:8px;
+    margin-left:4px;
+  }
+
+  /* ===== Sub Screen Header ===== */
+  .sub-header {
+    display:flex; align-items:center; gap:14px; margin-bottom:24px;
+  }
+  .back-btn {
+    width:38px; height:38px;
+    border-radius:50%;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    transition:.2s;
+    flex-shrink:0;
+  }
+  .back-btn:active { background:var(--glass-strong); }
+  .back-btn svg { width:18px; height:18px; stroke:var(--text); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .sub-title { font-size:18px; font-weight:600; }
+
+  /* ===== Counseling & Volunteer ===== */
+  .info-block {
+    padding:22px;
+    border-radius:20px;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    margin-bottom:14px;
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+  }
+  .info-block h4 {
+    font-size:15px; margin-bottom:10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .info-block h4 svg { width:18px; height:18px; stroke:var(--text); fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .info-block p { font-size:13px; color:var(--text-secondary); line-height:1.8; }
+  .info-block .phone {
+    font-size:22px; font-weight:600; color:var(--text); margin:12px 0;
+    display:flex; align-items:center; gap:8px;
+  }
+  .info-block .phone svg { width:20px; height:20px; stroke:var(--text); fill:none; stroke-width:1.7; }
+  .form-field { margin-bottom:16px; }
+  .form-field label { display:block; font-size:13px; color:var(--text-secondary); margin-bottom:8px; }
+  .form-input {
+    width:100%;
+    padding:14px 16px;
+    border-radius:16px;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    color:var(--text);
+    font-size:14px;
+    outline:none;
+    font-family:inherit;
+  }
+  .form-input::placeholder { color:var(--text-faint); }
+  .submit-btn {
+    width:100%;
+    padding:16px;
+    border-radius:20px;
+    background:var(--accent);
+    color:#3a4a44;
+    font-size:15px;
+    font-weight:600;
+    text-align:center;
+    cursor:pointer;
+    border:none;
+    font-family:inherit;
+    margin-top:12px;
+    transition:.2s;
+  }
+  .submit-btn:active { opacity:.85; transform:translateY(-1px); }
+
+  /* ===== Toast ===== */
+  .toast {
+    position:fixed;
+    top:60px; left:50%; transform:translateX(-50%) translateY(-20px);
+    padding:12px 26px;
+    border-radius:20px;
+    background:rgba(40,50,46,0.85);
+    color:var(--text);
+    font-size:14px;
+    z-index:999;
+    opacity:0;
+    transition:.3s;
+    pointer-events:none;
+    backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,0.15);
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ===== Meditation Player ===== */
+  .player-visual {
+    width:200px; height:200px;
+    margin:40px auto 30px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.25), rgba(255,255,255,0.05));
+    display:flex; align-items:center; justify-content:center;
+    animation: breathe 5s ease-in-out infinite;
+    position:relative;
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,0.15);
+  }
+  .player-visual::before {
+    content:'';position:absolute;inset:-20px;
+    border-radius:50%;
+    border:1px solid rgba(255,255,255,0.12);
+    animation: breathe 5s ease-in-out infinite reverse;
+  }
+  .player-visual .play-icon { display:flex; }
+  .player-visual .play-icon svg { width:60px; height:60px; stroke:var(--text); fill:none; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; }
+  .player-title { text-align:center; font-size:20px; font-weight:600; margin-bottom:8px; }
+  .player-sub { text-align:center; font-size:13px; color:var(--text-secondary); margin-bottom:30px; }
+  .progress-bar {
+    width:100%; height:4px;
+    background:rgba(255,255,255,0.15);
+    border-radius:2px;
+    margin-bottom:10px;
+    overflow:hidden;
+  }
+  .progress-fill { width:35%; height:100%; background:var(--accent); border-radius:2px; transition:width .3s; }
+  .progress-time { display:flex; justify-content:space-between; font-size:11px; color:var(--text-secondary); }
+  .player-controls {
+    display:flex; align-items:center; justify-content:center; gap:36px; margin-top:30px;
+  }
+  .ctrl-btn {
+    width:48px; height:48px; border-radius:50%;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    transition:.2s;
+    color:var(--text);
+  }
+  .ctrl-btn svg { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .ctrl-btn:active { background:var(--glass-strong); }
+  .ctrl-btn.main {
+    width:68px; height:68px;
+    background:var(--accent);
+    border:none;
+  }
+  .ctrl-btn.main svg { width:26px; height:26px; stroke:#3a4a44; }
+
+  /* ===== Crisis Modal ===== */
+  .modal-overlay {
+    display:none;
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.55);
+    backdrop-filter:blur(8px);
+    z-index:200;
+    align-items:center; justify-content:center;
+    padding:24px;
+  }
+  .modal-overlay.show { display:flex; }
+  .modal-card {
+    background:#3a4a44;
+    border-radius:24px;
+    padding:28px 24px;
+    max-width:340px;
+    width:100%;
+    text-align:center;
+    animation:fadeIn .3s ease;
+    border:1px solid rgba(255,255,255,0.15);
+  }
+  .modal-card .crisis-icon {
+    display:flex; justify-content:center; margin-bottom:16px;
+  }
+  .modal-card .crisis-icon svg { width:44px; height:44px; stroke:#ffb0b0; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .modal-card h3 { font-size:17px; margin-bottom:12px; }
+  .modal-card p { font-size:13px; color:var(--text-secondary); line-height:1.8; margin-bottom:18px; }
+  .modal-card .crisis-phone {
+    font-size:22px; font-weight:600; color:var(--text); margin-bottom:18px;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .modal-card .crisis-phone svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.7; }
+  .modal-close {
+    padding:14px 32px;
+    border-radius:20px;
+    background:var(--accent);
+    color:#3a4a44;
+    border:none;
+    font-size:15px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:inherit;
+    width:100%;
+  }
+
+  /* ===== 捞瓶子 - 海面选瓶场景 ===== */
+  .pick-ocean-overlay {
+    display:none;
+    position:absolute;
+    inset:0;
+    z-index:150;
+    background: linear-gradient(180deg, #2a3a34 0%, #3a5a52 30%, #4a6a62 55%, #5a7a72 75%, #3a5a52 100%);
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-start;
+    overflow:hidden;
+  }
+  .pick-ocean-overlay.active { display:flex; animation: fadeIn .5s ease; }
+
+  .pick-ocean-header {
+    width:100%;
+    padding:24px 22px 0;
+    display:flex; align-items:center; gap:14px;
+    z-index:10;
+  }
+
+  .pick-ocean-hint {
+    text-align:center;
+    font-size:14px;
+    color:var(--text-secondary);
+    margin-top:20px;
+    z-index:10;
+    animation: breathe 3s ease-in-out infinite;
+  }
+
+  .pick-ocean-sea {
+    position:absolute;
+    bottom:0; left:0; right:0;
+    height:75%;
+    overflow:hidden;
+  }
+
+  /* 多层波浪 */
+  .sea-wave-layer {
+    position:absolute;
+    left:-50%; right:-50%;
+    height:30px;
+    background:rgba(255,255,255,0.04);
+    border-radius:50%;
+  }
+  .sea-wave-layer:nth-child(1) {
+    top:0;
+    animation: seaWave1 6s ease-in-out infinite;
+  }
+  .sea-wave-layer:nth-child(2) {
+    top:15px;
+    background:rgba(255,255,255,0.03);
+    animation: seaWave2 7s ease-in-out infinite;
+  }
+  .sea-wave-layer:nth-child(3) {
+    top:30px;
+    background:rgba(255,255,255,0.025);
+    animation: seaWave3 8s ease-in-out infinite;
+  }
+  @keyframes seaWave1 { 0%,100%{transform:translateX(0) scaleY(1)} 50%{transform:translateX(15px) scaleY(1.3)} }
+  @keyframes seaWave2 { 0%,100%{transform:translateX(0) scaleY(1)} 50%{transform:translateX(-20px) scaleY(1.2)} }
+  @keyframes seaWave3 { 0%,100%{transform:translateX(0) scaleY(1)} 50%{transform:translateX(10px) scaleY(1.1)} }
+
+  /* 月光/氛围光 */
+  .sea-moonlight {
+    position:absolute;
+    top:-5%; left:50%; transform:translateX(-50%);
+    width:200px; height:200px;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+    pointer-events:none;
+  }
+
+  /* 漂浮的瓶子 */
+  .sea-bottle {
+    position:absolute;
+    width:40px; height:56px;
+    cursor:pointer;
+    transition: transform .3s ease, opacity .3s ease;
+    z-index:5;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+  }
+  .sea-bottle:hover { transform:scale(1.12) !important; }
+  .sea-bottle:active { transform:scale(0.95) !important; }
+
+  .sea-bottle-inner {
+    width:100%; height:100%;
+    border-radius:20px 20px 14px 14px;
+    position:relative;
+    opacity:0.85;
+    transition: opacity .3s;
+  }
+  .sea-bottle:hover .sea-bottle-inner { opacity:1; }
+  .sea-bottle-inner::before {
+    content:'';
+    position:absolute;
+    top:-10px; left:50%; transform:translateX(-50%);
+    width:14px; height:11px;
+    border-radius:3px 3px 0 0;
+    background:inherit; opacity:.7;
+  }
+  .sea-bottle-inner::after {
+    content:'';
+    position:absolute;
+    top:10px; left:10px;
+    width:10px; height:14px;
+    border-radius:50%;
+    background:rgba(255,255,255,.25);
+  }
+
+  /* 瓶子漂浮动画 - 5种不同的节奏 */
+  @keyframes bottleFloat1 { 
+    0%,100%{transform:translateY(0) rotate(-3deg)} 
+    25%{transform:translateY(-12px) rotate(2deg)}
+    50%{transform:translateY(-5px) rotate(-1deg)}
+    75%{transform:translateY(-15px) rotate(3deg)}
+  }
+  @keyframes bottleFloat2 { 
+    0%,100%{transform:translateY(0) rotate(2deg)} 
+    30%{transform:translateY(-18px) rotate(-3deg)}
+    60%{transform:translateY(-8px) rotate(1deg)}
+  }
+  @keyframes bottleFloat3 { 
+    0%,100%{transform:translateY(0) rotate(-2deg)} 
+    40%{transform:translateY(-10px) rotate(4deg)}
+    70%{transform:translateY(-20px) rotate(-1deg)}
+  }
+  @keyframes bottleFloat4 { 
+    0%,100%{transform:translateY(0) rotate(1deg)} 
+    35%{transform:translateY(-14px) rotate(-2deg)}
+    65%{transform:translateY(-6px) rotate(3deg)}
+  }
+  @keyframes bottleFloat5 { 
+    0%,100%{transform:translateY(0) rotate(-1deg)} 
+    20%{transform:translateY(-8px) rotate(2deg)}
+    50%{transform:translateY(-16px) rotate(-3deg)}
+    80%{transform:translateY(-4px) rotate(1deg)}
+  }
+
+  .sea-bottle:nth-child(1) .sea-bottle-inner { animation: bottleFloat1 4.5s ease-in-out infinite; }
+  .sea-bottle:nth-child(2) .sea-bottle-inner { animation: bottleFloat2 5.2s ease-in-out infinite; }
+  .sea-bottle:nth-child(3) .sea-bottle-inner { animation: bottleFloat3 4.8s ease-in-out infinite; }
+  .sea-bottle:nth-child(4) .sea-bottle-inner { animation: bottleFloat4 5.5s ease-in-out infinite; }
+  .sea-bottle:nth-child(5) .sea-bottle-inner { animation: bottleFloat5 4.2s ease-in-out infinite; }
+
+  /* 水花溅起效果 */
+  .splash-ring {
+    position:absolute;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,0.4);
+    pointer-events:none;
+    opacity:0;
+    z-index:20;
+  }
+
+  @keyframes splashExpand {
+    0% { transform:translate(-50%,-50%) scale(0); opacity:0.8; }
+    100% { transform:translate(-50%,-50%) scale(3); opacity:0; }
+  }
+
+  /* 捞起动画 */
+  @keyframes bottleLiftUp {
+    0% { transform: scale(1); opacity:1; }
+    30% { transform: scale(1.2) translateY(-30px); opacity:1; }
+    60% { transform: scale(1.5) translateY(-80px); opacity:1; }
+    100% { transform: scale(2) translateY(-150px); opacity:0; }
+  }
+
+  /* 其他瓶子沉入水中 */
+  @keyframes bottleSinkAway {
+    0% { transform: translateY(0); opacity:0.85; }
+    100% { transform: translateY(60px); opacity:0; }
+  }
+
+  /* 涟漪水纹（在点击瓶子时扩散） */
+  .water-ripple {
+    position:absolute;
+    border-radius:50%;
+    background:rgba(255,255,255,0.08);
+    pointer-events:none;
+    z-index:4;
+    opacity:0;
+  }
+  @keyframes waterRipple {
+    0% { transform:translate(-50%,-50%) scale(0); opacity:0.5; }
+    100% { transform:translate(-50%,-50%) scale(5); opacity:0; }
+  }
+
+  /* 小气泡 */
+  .sea-bubble {
+    position:absolute;
+    border-radius:50%;
+    background:rgba(255,255,255,0.15);
+    pointer-events:none;
+    z-index:3;
+  }
+  @keyframes bubbleRise {
+    0% { transform:translateY(0) scale(1); opacity:0.6; }
+    100% { transform:translateY(-80px) scale(0.3); opacity:0; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- ====== HOME SCREEN ====== -->
+  <div class="screen active" id="screen-home">
+    <div class="top-bar">
+      <div>
+        <div class="greeting" id="greeting">下午好</div>
+        <div class="sub-greeting">今天的你，还好吗？</div>
+      </div>
+      <div class="top-actions">
+        <div class="top-round-btn">
+          <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        </div>
+        <div class="avatar-round">
+          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="mood-section glass-card">
+      <h3>今日心情打卡</h3>
+      <div class="mood-bottle-preview" id="moodBottle"></div>
+      <div class="mood-track-wrapper">
+        <div class="mood-track" id="moodTrack">
+          <div class="mood-thumb" id="moodThumb" style="left:50%"></div>
+        </div>
+      </div>
+      <div class="mood-label" id="moodLabel">平静</div>
+    </div>
+    <div class="section-title">
+      <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      此刻建议
+    </div>
+    <div class="med-scroll">
+      <div class="med-card" onclick="openMedPlayer('助眠','moon','帮助你放松入睡，告别失眠烦恼')">
+        <div class="icon-wrap">
+          <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </div>
+        <div class="name">助眠</div>
+        <div class="desc">放松入睡</div>
+      </div>
+      <div class="med-card" onclick="openMedPlayer('缓解焦虑','leaf','让焦虑慢慢散去，回归平静')">
+        <div class="icon-wrap">
+          <svg viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+        </div>
+        <div class="name">缓解焦虑</div>
+        <div class="desc">回归平静</div>
+      </div>
+      <div class="med-card" onclick="openMedPlayer('提升专注力','target','集中注意力，进入心流状态')">
+        <div class="icon-wrap">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+        </div>
+        <div class="name">提升专注力</div>
+        <div class="desc">进入心流</div>
+      </div>
+      <div class="med-card" onclick="openMedPlayer('呼吸训练','wind','跟随节奏呼吸，舒缓身心')">
+        <div class="icon-wrap">
+          <svg viewBox="0 0 24 24"><path d="M9.59 4.59A2 2 0 1 1 11 8H2"/><path d="M17.73 7.73A2.5 2.5 0 1 1 19.5 12H2"/><path d="M12.59 19.41A2 2 0 1 0 14 16H2"/></svg>
+        </div>
+        <div class="name">呼吸训练</div>
+        <div class="desc">舒缓身心</div>
+      </div>
+      <div class="med-card" onclick="openMedPlayer('自由冥想','sparkle','不设限制，自由探索内心')">
+        <div class="icon-wrap">
+          <svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+        </div>
+        <div class="name">自由冥想</div>
+        <div class="desc">探索内心</div>
+      </div>
+    </div>
+    <div class="section-title">
+      <svg viewBox="0 0 24 24"><path d="M2 12c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 18c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 6c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/></svg>
+      今日推荐
+    </div>
+    <div class="audio-card" onclick="openMedPlayer('海浪白噪音','wave','15分钟海浪声，伴你入眠')">
+      <div class="audio-play-btn">
+        <svg viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+      </div>
+      <div class="audio-info">
+        <div class="title">海浪白噪音 · 助眠</div>
+        <div class="dur">15 分钟</div>
+      </div>
+    </div>
+    <div class="audio-card" onclick="openMedPlayer('森林雨声','rain','20分钟雨声冥想')">
+      <div class="audio-play-btn">
+        <svg viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+      </div>
+      <div class="audio-info">
+        <div class="title">森林雨声 · 专注</div>
+        <div class="dur">20 分钟</div>
+      </div>
+    </div>
+    <div style="height:80px"></div>
+    <div class="consult-float" onclick="openSub('counseling')">
+      <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+    </div>
+  </div>
+
+  <!-- ====== BOTTLE HOME ====== -->
+  <div class="screen" id="screen-bottle">
+    <div class="greeting">漂流瓶</div>
+    <div class="sub-greeting">投出你的心声，捞起他人的故事</div>
+    <div class="bottle-ocean">
+      <div class="ocean-wave"></div>
+      <div class="bottle-action-btn btn-write" onclick="openSub('write')">
+        <span class="btn-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </span>
+        <span class="btn-text">写瓶子</span>
+      </div>
+      <div class="bottle-action-btn btn-pick" onclick="openPickOcean()">
+        <span class="btn-icon">
+          <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+        </span>
+        <span class="btn-text">捞瓶子</span>
+      </div>
+    </div>
+    <div class="section-title">最近投递</div>
+    <div id="recentPosts">
+      <div class="recent-item">
+        <div class="recent-dot" style="background:#a8c9a0"></div>
+        <div class="recent-text">今天图书馆关门了，只好在湖边坐了一会儿…</div>
+        <div class="recent-time">2小时前</div>
+      </div>
+      <div class="recent-item">
+        <div class="recent-dot" style="background:#e8c97a"></div>
+        <div class="recent-text">收到了论文通过的消息！开心到飞起！</div>
+        <div class="recent-time">5小时前</div>
+      </div>
+      <div class="recent-item">
+        <div class="recent-dot" style="background:#c4a8c0"></div>
+        <div class="recent-text">不知道未来要走哪条路，好迷茫…</div>
+        <div class="recent-time">昨天</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== CABINET ====== -->
+  <div class="screen" id="screen-cabinet">
+    <div class="greeting">柜子</div>
+    <div class="sub-greeting">珍藏你的心情碎片</div>
+    <div class="cabinet-tabs">
+      <div class="cab-tab active" onclick="switchCabTab(this,0)">草稿</div>
+      <div class="cab-tab" onclick="switchCabTab(this,1)">心情日记</div>
+    </div>
+    <div id="cabContent0">
+      <div class="cabinet-item">
+        <div class="cab-content">想写点什么，但又不知从何说起。先存着吧。</div>
+        <div class="cab-meta">草稿 · 10月12日 22:30</div>
+      </div>
+      <div class="cabinet-item">
+        <div class="cab-content">下周要答辩了，压力好大，但又不想让别人看到...</div>
+        <div class="cab-meta">草稿 · 10月10日 18:15</div>
+      </div>
+    </div>
+    <div id="cabContent1" style="display:none">
+      <div class="cabinet-item">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div class="recent-dot" style="background:#a8c9a0"></div>
+          <span style="font-size:12px;color:var(--text-secondary)">平静</span>
+        </div>
+        <div class="cab-content">今天在操场跑了三圈，出了一身汗，感觉好多了。</div>
+        <div class="cab-meta">日记 · 10月11日 21:00</div>
+      </div>
+      <div class="cabinet-item">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div class="recent-dot" style="background:#e8c97a"></div>
+          <span style="font-size:12px;color:var(--text-secondary)">开心</span>
+        </div>
+        <div class="cab-content">和好久不见的高中同学视频了，笑了整整一个小时。</div>
+        <div class="cab-meta">日记 · 10月9日 20:45</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== MINE ====== -->
+  <div class="screen" id="screen-mine">
+    <div class="profile-header">
+      <div class="avatar">
+        <svg viewBox="0 0 24 24"><path d="M2 12c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 18c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 6c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/></svg>
+      </div>
+      <div>
+        <div class="profile-name">匿名海浪</div>
+        <div class="profile-id">ID: tide_2024</div>
+      </div>
+    </div>
+    <div class="mine-menu-item" onclick="openSub('myBottles')">
+      <div class="label">
+        <svg viewBox="0 0 24 24"><path d="M10 2h4v3l1.5 2v13a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2V7L10 5V2z"/></svg>
+        我的投递 <span class="mine-badge">2条新回应</span>
+      </div>
+      <div class="arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="mine-menu-item" onclick="openSub('myResponses')">
+      <div class="label">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        收到的回应
+      </div>
+      <div class="arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="mine-menu-item" onclick="openSub('volunteer')">
+      <div class="label">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        成为志愿者
+      </div>
+      <div class="arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="mine-menu-item" onclick="openSub('counseling')">
+      <div class="label">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+        线下咨询
+      </div>
+      <div class="arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="mine-menu-item">
+      <div class="label">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        设置
+      </div>
+      <div class="arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+  </div>
+
+  <!-- ====== SUB: Write Bottle ====== -->
+  <div class="sub-screen" id="sub-write">
+    <div class="sub-header">
+      <div class="back-btn" onclick="closeSub('write')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="sub-title">写瓶子</div>
+    </div>
+    <div class="step-indicator">
+      <div class="step-dot active" id="sd1"></div>
+      <div class="step-dot" id="sd2"></div>
+      <div class="step-dot" id="sd3"></div>
+      <div class="step-dot" id="sd4"></div>
+    </div>
+    <div id="writeStep1">
+      <textarea class="write-area" id="bottleInput" placeholder="写下此刻的心情吧…" maxlength="500" oninput="updateCharCount()"></textarea>
+      <div class="char-count"><span id="charCount">0</span> / 500</div>
+      <div style="margin-top:14px">
+        <button class="submit-btn" onclick="goWriteStep(2)">下一步：选择情绪色彩</button>
+      </div>
+    </div>
+    <div id="writeStep2" style="display:none">
+      <div class="glass-card" style="text-align:center">
+        <div class="mood-bottle-preview" id="writeMoodBottle"></div>
+        <div class="mood-track-wrapper">
+          <div class="mood-track" id="writeMoodTrack">
+            <div class="mood-thumb" id="writeMoodThumb" style="left:50%"></div>
+          </div>
+        </div>
+        <div class="mood-label" id="writeMoodLabel">平静</div>
+      </div>
+      <button class="submit-btn" onclick="goWriteStep(3)">下一步：选择可见性</button>
+    </div>
+    <div id="writeStep3" style="display:none">
+      <div class="visibility-options">
+        <div class="vis-opt selected" onclick="selectVis(this,'public')">
+          <span class="vis-icon">
+            <svg viewBox="0 0 24 24"><path d="M2 12c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 18c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 6c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/></svg>
+          </span>
+          公开
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:6px">所有人可捞</div>
+        </div>
+        <div class="vis-opt" onclick="selectVis(this,'private')">
+          <span class="vis-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </span>
+          私密
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:6px">仅志愿者可见</div>
+        </div>
+      </div>
+      <button class="submit-btn" onclick="goWriteStep(4)">下一步：选择去向</button>
+    </div>
+    <div id="writeStep4" style="display:none">
+      <div class="dest-options">
+        <div class="dest-btn primary" onclick="submitBottle('send')">
+          <svg viewBox="0 0 24 24"><path d="M2 12c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 18c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 6c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/></svg>
+          扔出去
+        </div>
+        <div class="dest-btn" onclick="submitBottle('draft')">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          存为草稿
+        </div>
+        <div class="dest-btn" onclick="submitBottle('diary')">
+          <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          存为日记
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== SUB: Picked Bottle ====== -->
+  <div class="sub-screen" id="sub-pick">
+    <div class="sub-header">
+      <div class="back-btn" onclick="closeSub('pick')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="sub-title">捞到一个瓶子</div>
+    </div>
+    <div class="picked-bottle-card">
+      <div class="picked-bottle-vis" id="pickedBottleVis"></div>
+      <div class="picked-nickname" id="pickedNickname"></div>
+      <div class="picked-content" id="pickedContent"></div>
+      <div class="picked-hugs">
+        <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <span id="pickedHugs">0</span> 个抱抱
+      </div>
+    </div>
+    <div class="section-divider">
+      <span>
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        大家的回应
+      </span>
+    </div>
+    <div id="commentList">
+      <div class="comment-item">
+        <div class="comment-avatar" style="background:rgba(168,201,160,0.4)">匿</div>
+        <div class="comment-body">
+          <div class="comment-name">匿名小鹿</div>
+          <div class="comment-text">抱抱你，会好的</div>
+        </div>
+      </div>
+      <div class="comment-item">
+        <div class="comment-avatar" style="background:rgba(232,201,122,0.4)">匿</div>
+        <div class="comment-body">
+          <div class="comment-name">匿名星河</div>
+          <div class="comment-text">我也有过类似的感受，你不是一个人</div>
+        </div>
+      </div>
+    </div>
+    <div class="comment-input-wrap" id="commentInputWrap">
+      <input class="comment-input" id="commentInput" placeholder="写下你的回应（限100字）" maxlength="100">
+      <button class="comment-submit" onclick="submitComment()">发送</button>
+    </div>
+    <div class="section-divider">
+      <span>
+        <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        朋辈志愿者的回复
+      </span>
+    </div>
+    <div id="volunteerReplyArea">
+      <div class="no-reply-hint">暂未收到志愿者回复，投递者会收到专属回应</div>
+    </div>
+    <div class="action-bar">
+      <div class="action-btn btn-hug" id="hugBtn" onclick="hugBottle()">
+        <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        抱抱 TA
+      </div>
+      <div class="action-btn btn-comment" onclick="toggleCommentInput()">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        写评论
+      </div>
+      <div class="action-btn btn-release" onclick="closeSub('pick')">
+        <svg viewBox="0 0 24 24"><path d="M2 12c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 18c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 6c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/></svg>
+        放回海里
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== SUB: Meditation Player ====== -->
+  <div class="sub-screen" id="sub-player">
+    <div class="sub-header">
+      <div class="back-btn" onclick="closeSub('player')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="sub-title" id="playerTitle">冥想</div>
+    </div>
+    <div class="player-visual">
+      <div class="play-icon" id="playerIcon">
+        <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </div>
+    </div>
+    <div class="player-title" id="playerName">助眠冥想</div>
+    <div class="player-sub" id="playerDesc">帮助你放松入睡</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-time">
+      <span id="currentTime">05:15</span>
+      <span id="totalTime">15:00</span>
+    </div>
+    <div class="player-controls">
+      <div class="ctrl-btn">
+        <svg viewBox="0 0 24 24"><polygon points="11 19 2 12 11 5 11 19"/><line x1="22" y1="5" x2="22" y2="19"/></svg>
+      </div>
+      <div class="ctrl-btn main" id="playPauseBtn" onclick="togglePlay()">
+        <svg viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+      </div>
+      <div class="ctrl-btn">
+        <svg viewBox="0 0 24 24"><polygon points="13 19 22 12 13 5 13 19"/><line x1="2" y1="5" x2="2" y2="19"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== SUB: Counseling ====== -->
+  <div class="sub-screen" id="sub-counseling">
+    <div class="sub-header">
+      <div class="back-btn" onclick="closeSub('counseling')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="sub-title">线下咨询</div>
+    </div>
+    <div class="info-block">
+      <h4>
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+        学校心理咨询中心
+      </h4>
+      <p>如果你需要面对面的专业帮助，可以前往学校心理咨询中心预约。</p>
+      <div class="phone">
+        <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        400-161-9995
+      </div>
+      <p>地址：学生事务中心 3 楼 301 室<br>工作时间：周一至周五 9:00 - 17:00</p>
+    </div>
+    <div class="info-block">
+      <h4>
+        <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        24 小时危机热线
+      </h4>
+      <p>如果你或身边的人正处于危机中，请立即拨打：</p>
+      <div class="phone">
+        <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        010-82951332
+      </div>
+      <p>北京心理危机研究与干预中心 24 小时热线<br>全国心理援助热线：<strong>400-161-9995</strong></p>
+    </div>
+    <div class="info-block">
+      <h4>
+        <svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg>
+        预约方式
+      </h4>
+      <p>1. 关注学校心理中心公众号在线预约<br>2. 直接前往咨询中心前台预约<br>3. 拨打上方电话预约<br><br>首次咨询免费，后续咨询享学生优惠。所有咨询内容严格保密。</p>
+    </div>
+  </div>
+
+  <!-- ====== SUB: Volunteer Apply ====== -->
+  <div class="sub-screen" id="sub-volunteer">
+    <div class="sub-header">
+      <div class="back-btn" onclick="closeSub('volunteer')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="sub-title">成为朋辈志愿者</div>
+    </div>
+    <div class="info-block">
+      <h4>
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        什么是朋辈志愿者？
+      </h4>
+      <p>朋辈志愿者是经过培训的心理学院学生，为同学提供倾听与陪伴。你的回复将以"朋辈志愿者"的匿名身份展示给投递者。</p>
+    </div>
+    <div class="form-field">
+      <label>姓名</label>
+      <input class="form-input" placeholder="请输入真实姓名">
+    </div>
+    <div class="form-field">
+      <label>学号</label>
+      <input class="form-input" placeholder="请输入学号">
+    </div>
+    <div class="form-field">
+      <label>学院</label>
+      <input class="form-input" placeholder="如：心理学院">
+    </div>
+    <div class="form-field">
+      <label>申请理由</label>
+      <textarea class="form-input" style="min-height:100px;resize:none" placeholder="简单说说你想成为志愿者的原因…"></textarea>
+    </div>
+    <button class="submit-btn" onclick="showToast('申请已提交，请等待审核')">提交申请</button>
+  </div>
+
+  <!-- ====== SUB: My Bottles ====== -->
+  <div class="sub-screen" id="sub-myBottles">
+    <div class="sub-header">
+      <div class="back-btn" onclick="closeSub('myBottles')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="sub-title">我的投递</div>
+    </div>
+    <div class="cabinet-item">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="recent-dot" style="background:#a8c9a0"></div>
+        <span style="font-size:12px;color:var(--text-secondary)">公开 · 悲伤</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text)">志愿者已回复</span>
+      </div>
+      <div class="cab-content">今天图书馆关门了，只好在湖边坐了一会儿…</div>
+      <div class="cab-meta" style="margin-top:10px">
+        <span>
+          <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          12 个抱抱
+        </span>
+        <span>
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          3 条评论
+        </span>
+        <span style="margin-left:auto">2小时前</span>
+      </div>
+    </div>
+    <div class="cabinet-item">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="recent-dot" style="background:#e8c97a"></div>
+        <span style="font-size:12px;color:var(--text-secondary)">公开 · 开心</span>
+      </div>
+      <div class="cab-content">收到了论文通过的消息！开心到飞起！</div>
+      <div class="cab-meta" style="margin-top:10px">
+        <span>
+          <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          28 个抱抱
+        </span>
+        <span>
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          7 条评论
+        </span>
+        <span style="margin-left:auto">5小时前</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== SUB: My Responses ====== -->
+  <div class="sub-screen" id="sub-myResponses">
+    <div class="sub-header">
+      <div class="back-btn" onclick="closeSub('myResponses')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="sub-title">收到的回应</div>
+    </div>
+    <div class="section-divider">
+      <span>
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        大家的抱抱与评论
+      </span>
+    </div>
+    <div class="glass-card">
+      <div class="comment-item">
+        <div class="comment-avatar" style="background:rgba(168,201,160,0.4)">匿</div>
+        <div class="comment-body">
+          <div class="comment-name">匿名小鹿 · 对"图书馆关门…"</div>
+          <div class="comment-text">抱抱你，会好的</div>
+        </div>
+      </div>
+      <div class="comment-item">
+        <div class="comment-avatar" style="background:rgba(232,201,122,0.4)">匿</div>
+        <div class="comment-body">
+          <div class="comment-name">匿名星河 · 对"图书馆关门…"</div>
+          <div class="comment-text">我也有过类似的感受，你不是一个人</div>
+        </div>
+      </div>
+      <div class="comment-item">
+        <div class="comment-avatar" style="background:rgba(212,160,144,0.4)">匿</div>
+        <div class="comment-body">
+          <div class="comment-name">匿名暖阳 · 对"论文通过…"</div>
+          <div class="comment-text">太棒了！恭喜恭喜</div>
+        </div>
+      </div>
+    </div>
+    <div class="section-divider">
+      <span>
+        <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        志愿者的专属回复（仅你可见）
+      </span>
+    </div>
+    <div class="volunteer-reply-card">
+      <div class="volunteer-badge">
+        <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        朋辈志愿者
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">回复你的"图书馆关门…"</div>
+      <div class="volunteer-reply-text">
+        你好呀，感觉到你今天有些低落。一个人在湖边坐着，其实也是一种和自己相处的方式呢。有时候不需要做什么特别的事情，只是静静待着，让情绪自然地流过就好。如果你愿意多聊聊，随时可以再投递瓶子。我们一直在这里。
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 捞瓶子 - 海面选瓶场景 ====== -->
+  <div class="pick-ocean-overlay" id="pickOceanOverlay">
+    <div class="pick-ocean-header">
+      <div class="back-btn" onclick="closePickOcean()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="sub-title">选一个瓶子</div>
+    </div>
+    <div class="pick-ocean-hint" id="pickOceanHint">点击海面上的瓶子，把它捞起来</div>
+    <div class="pick-ocean-sea" id="pickOceanSea">
+      <div class="sea-moonlight"></div>
+      <div class="sea-wave-layer"></div>
+      <div class="sea-wave-layer"></div>
+      <div class="sea-wave-layer"></div>
+    </div>
+  </div>
+
+  <!-- ====== BOTTOM TAB BAR ====== -->
+  <div class="tab-bar">
+    <div class="tab-item active" onclick="switchTab('home',this)">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>首页</span>
+    </div>
+    <div class="tab-item" onclick="switchTab('bottle',this)">
+      <svg viewBox="0 0 24 24"><path d="M10 2h4v3l1.5 2v13a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2V7L10 5V2z"/></svg>
+      <span>漂流瓶</span>
+    </div>
+    <div class="tab-item" onclick="switchTab('cabinet',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span>柜子</span>
+    </div>
+    <div class="tab-item" onclick="switchTab('mine',this)">
+      <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>我的</span>
+    </div>
+  </div>
+
+  <!-- ====== Crisis Modal ====== -->
+  <div class="modal-overlay" id="crisisModal">
+    <div class="modal-card">
+      <div class="crisis-icon">
+        <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <h3>我们注意到你可能需要帮助</h3>
+      <p>如果你正在经历困难，请记住你并不孤单。以下是专业的心理援助资源：</p>
+      <div class="crisis-phone">
+        <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        400-161-9995
+      </div>
+      <p style="font-size:12px">全国心理援助热线 · 24小时</p>
+      <button class="modal-close" onclick="closeCrisisModal()">我知道了</button>
+    </div>
+  </div>
+
+  <!-- ====== Toast ====== -->
+  <div class="toast" id="toast"></div>
+</div>
+<script>
+  // ===== 线性图标映射 =====
+  const ICONS = {
+    moon:   '<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+    leaf:   '<svg viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>',
+    target: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>',
+    wind:   '<svg viewBox="0 0 24 24"><path d="M9.59 4.59A2 2 0 1 1 11 8H2"/><path d="M17.73 7.73A2.5 2.5 0 1 1 19.5 12H2"/><path d="M12.59 19.41A2 2 0 1 0 14 16H2"/></svg>',
+    sparkle:'<svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>',
+    wave:   '<svg viewBox="0 0 24 24"><path d="M2 12c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 18c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 6c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/></svg>',
+    rain:   '<svg viewBox="0 0 24 24"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 16.58"/><line x1="8" y1="18" x2="8" y2="21"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="16" y1="18" x2="16" y2="21"/></svg>',
+    heart:  '<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+    play:   '<svg viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>',
+    pause:  '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
+  };
+
+  // ===== Mood Color Mapping =====
+  function moodToColor(value) {
+    const stops = [
+      { pos: 0,   r: 232, g: 201, b: 122 },
+      { pos: 20,  r: 168, g: 201, b: 160 },
+      { pos: 40,  r: 154, g: 176, b: 196 },
+      { pos: 60,  r: 196, g: 168, b: 192 },
+      { pos: 80,  r: 212, g: 160, b: 144 },
+      { pos: 100, r: 176, g: 128, b: 128 },
+    ];
+    let v = Math.max(0, Math.min(100, value));
+    let i = 0;
+    for (let j = 0; j < stops.length - 1; j++) {
+      if (v >= stops[j].pos && v <= stops[j + 1].pos) { i = j; break; }
+    }
+    let t = (v - stops[i].pos) / (stops[i + 1].pos - stops[i].pos);
+    let r = Math.round(stops[i].r + t * (stops[i + 1].r - stops[i].r));
+    let g = Math.round(stops[i].g + t * (stops[i + 1].g - stops[i].g));
+    let b = Math.round(stops[i].b + t * (stops[i + 1].b - stops[i].b));
+    return `rgb(${r},${g},${b})`;
+  }
+  function moodToLabel(value) {
+    if (value <= 20) return '开心';
+    if (value <= 40) return '平静';
+    if (value <= 60) return '悲伤';
+    if (value <= 80) return '焦虑';
+    return '愤怒';
+  }
+
+  // ===== Mood Slider =====
+  function initMoodSlider(trackId, thumbId, bottleId, labelId) {
+    const track = document.getElementById(trackId);
+    const thumb = document.getElementById(thumbId);
+    const bottle = document.getElementById(bottleId);
+    const label = document.getElementById(labelId);
+    let dragging = false;
+    let currentValue = 50;
+    function updateSlider(x) {
+      const rect = track.getBoundingClientRect();
+      let pct = (x - rect.left) / rect.width;
+      pct = Math.max(0, Math.min(1, pct));
+      currentValue = Math.round(pct * 100);
+      thumb.style.left = (pct * 100) + '%';
+      const color = moodToColor(currentValue);
+      if (bottle) {
+        bottle.style.background = color;
+        bottle.style.boxShadow = `0 0 30px ${color}50`;
+      }
+      thumb.style.boxShadow = `0 2px 12px rgba(0,0,0,.25), 0 0 20px ${color}60`;
+      if (label) label.textContent = moodToLabel(currentValue);
+    }
+    function onStart(e) {
+      dragging = true;
+      const x = e.touches ? e.touches[0].clientX : e.clientX;
+      updateSlider(x);
+    }
+    function onMove(e) {
+      if (!dragging) return;
+      e.preventDefault();
+      const x = e.touches ? e.touches[0].clientX : e.clientX;
+      updateSlider(x);
+    }
+    function onEnd() { dragging = false; }
+    track.addEventListener('mousedown', onStart);
+    track.addEventListener('touchstart', onStart, { passive: true });
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('mouseup', onEnd);
+    document.addEventListener('touchend', onEnd);
+    updateSlider(track.getBoundingClientRect().left + track.getBoundingClientRect().width * 0.5);
+    return () => currentValue;
+  }
+  let getHomeMood, getWriteMood;
+
+  // ===== Tab Navigation =====
+  function switchTab(name, el) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.sub-screen').forEach(s => s.classList.remove('active'));
+  }
+
+  // ===== Sub Screen Navigation =====
+  function openSub(name) {
+    document.getElementById('sub-' + name).classList.add('active');
+    if (name === 'write') {
+      resetWriteSteps();
+      setTimeout(() => {
+        getWriteMood = initMoodSlider('writeMoodTrack', 'writeMoodThumb', 'writeMoodBottle', 'writeMoodLabel');
+      }, 100);
+    }
+  }
+  function closeSub(name) {
+    document.getElementById('sub-' + name).classList.remove('active');
+  }
+
+  // ===== Greeting =====
+  function updateGreeting() {
+    const h = new Date().getHours();
+    let g = '晚上好';
+    if (h >= 5 && h < 9) g = '早上好';
+    else if (h >= 9 && h < 12) g = '上午好';
+    else if (h >= 12 && h < 14) g = '中午好';
+    else if (h >= 14 && h < 18) g = '下午好';
+    else if (h >= 18 && h < 22) g = '晚上好';
+    else g = '夜深了';
+    document.getElementById('greeting').textContent = g;
+  }
+
+  // ===== Write Bottle Steps =====
+  let writeStep = 1;
+  let selectedVis = 'public';
+  function resetWriteSteps() {
+    writeStep = 1;
+    for (let i = 1; i <= 4; i++) {
+      document.getElementById('writeStep' + i).style.display = i === 1 ? 'block' : 'none';
+      document.getElementById('sd' + i).classList.toggle('active', i === 1);
+    }
+    document.getElementById('bottleInput').value = '';
+    document.getElementById('charCount').textContent = '0';
+  }
+  function goWriteStep(step) {
+    if (step === 2 && !document.getElementById('bottleInput').value.trim()) {
+      showToast('请先写点什么吧');
+      return;
+    }
+    writeStep = step;
+    for (let i = 1; i <= 4; i++) {
+      document.getElementById('writeStep' + i).style.display = i === step ? 'block' : 'none';
+      document.getElementById('sd' + i).classList.toggle('active', i === step);
+    }
+  }
+  function updateCharCount() {
+    const len = document.getElementById('bottleInput').value.length;
+    document.getElementById('charCount').textContent = len;
+  }
+  function selectVis(el, type) {
+    document.querySelectorAll('.vis-opt').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedVis = type;
+  }
+
+  // ===== Crisis Keywords =====
+  const crisisWords = ['自杀', '不想活', '结束生命', '跳楼', '割腕', '安眠药', '遗书', '死了算了', '活着没意思'];
+  function checkCrisis(text) {
+    return crisisWords.some(w => text.includes(w));
+  }
+  function submitBottle(dest) {
+    const content = document.getElementById('bottleInput').value.trim();
+    if (!content) { showToast('瓶子不能是空的哦'); return; }
+    if (checkCrisis(content)) {
+      document.getElementById('crisisModal').classList.add('show');
+    }
+    const labels = { send: '瓶子已投入大海', draft: '已存为草稿', diary: '已存为心情日记' };
+    showToast(labels[dest]);
+    setTimeout(() => closeSub('write'), 800);
+  }
+  function closeCrisisModal() {
+    document.getElementById('crisisModal').classList.remove('show');
+  }
+
+  // ===== Pick Bottle - 海面选瓶交互 =====
+  const sampleBottles = [
+    { nickname: '匿名星辰', content: '期末周压力好大，每天都在图书馆待到闭馆。有时候会想，这一切到底值不值得。', mood: 55, hugs: 8 },
+    { nickname: '匿名暖阳', content: '今天终于鼓起勇气和喜欢的人说了话！虽然只是借了一支笔，但心跳了好久。', mood: 15, hugs: 23 },
+    { nickname: '匿名深海', content: '室友们都有实习了，只有我还在投简历。感觉自己被落下了好远…', mood: 65, hugs: 15 },
+    { nickname: '匿名月光', content: '半夜睡不着，听着窗外的雨声发呆。其实也不是不开心，就是有一种说不出的空落落。', mood: 48, hugs: 12 },
+    { nickname: '匿名春风', content: '刚和爸妈视频完，突然好想家。下个月就能回去了，再忍忍！', mood: 30, hugs: 19 },
+    { nickname: '匿名萤火', content: '今天一个人去看了电影，散场后走在空荡荡的街上，耳机里放着喜欢的歌。', mood: 42, hugs: 11 },
+    { nickname: '匿名云朵', content: '考研倒计时60天，每天都在焦虑和努力之间反复横跳…', mood: 72, hugs: 16 },
+  ];
+
+  let pickOceanActive = false;
+
+  function openPickOcean() {
+    const overlay = document.getElementById('pickOceanOverlay');
+    const sea = document.getElementById('pickOceanSea');
+    
+    // 清理旧的瓶子
+    sea.querySelectorAll('.sea-bottle').forEach(b => b.remove());
+    
+    // 随机选5个瓶子
+    const shuffled = [...sampleBottles].sort(() => Math.random() - 0.5);
+    const bottlesToShow = shuffled.slice(0, 5);
+    
+    // 瓶子位置布局（避免重叠）
+    const positions = [
+      { left: '12%', top: '18%' },
+      { left: '55%', top: '10%' },
+      { left: '75%', top: '30%' },
+      { left: '30%', top: '38%' },
+      { left: '60%', top: '52%' },
+    ];
+    
+    bottlesToShow.forEach((bottle, i) => {
+      const color = moodToColor(bottle.mood);
+      const el = document.createElement('div');
+      el.className = 'sea-bottle';
+      el.style.left = positions[i].left;
+      el.style.top = positions[i].top;
+      el.style.opacity = '0';
+      el.innerHTML = `<div class="sea-bottle-inner" style="background:${color}"></div>`;
+      el.dataset.bottleIndex = sampleBottles.indexOf(bottle);
+      el.addEventListener('click', function(e) {
+        onPickSeaBottle(this, bottle, e);
+      });
+      sea.appendChild(el);
+      
+      // 逐个浮现
+      setTimeout(() => {
+        el.style.opacity = '1';
+        el.style.transition = 'opacity 0.6s ease';
+      }, 300 + i * 200);
+    });
+    
+    overlay.classList.add('active');
+    pickOceanActive = true;
+    document.getElementById('pickOceanHint').style.opacity = '1';
+  }
+
+  function closePickOcean() {
+    const overlay = document.getElementById('pickOceanOverlay');
+    overlay.classList.remove('active');
+    pickOceanActive = false;
+  }
+
+  function onPickSeaBottle(el, bottle, event) {
+    if (!pickOceanActive) return;
+    pickOceanActive = false; // 防止重复点击
+    
+    const sea = document.getElementById('pickOceanSea');
+    const rect = el.getBoundingClientRect();
+    const seaRect = sea.getBoundingClientRect();
+    const cx = rect.left + rect.width/2 - seaRect.left;
+    const cy = rect.top + rect.height/2 - seaRect.top;
+    
+    // 隐藏提示文字
+    document.getElementById('pickOceanHint').style.opacity = '0';
+    document.getElementById('pickOceanHint').style.transition = 'opacity 0.3s';
+    
+    // 生成水纹涟漪
+    for (let i = 0; i < 3; i++) {
+      const ripple = document.createElement('div');
+      ripple.className = 'water-ripple';
+      ripple.style.left = cx + 'px';
+      ripple.style.top = cy + 'px';
+      ripple.style.width = '40px';
+      ripple.style.height = '40px';
+      sea.appendChild(ripple);
+      setTimeout(() => {
+        ripple.style.animation = `waterRipple 1.2s ease-out forwards`;
+      }, i * 200);
+      setTimeout(() => ripple.remove(), 1400 + i * 200);
+    }
+    
+    // 生成小气泡
+    for (let i = 0; i < 6; i++) {
+      const bubble = document.createElement('div');
+      bubble.className = 'sea-bubble';
+      const size = 4 + Math.random() * 8;
+      bubble.style.width = size + 'px';
+      bubble.style.height = size + 'px';
+      bubble.style.left = (cx - 20 + Math.random() * 40) + 'px';
+      bubble.style.top = (cy + Math.random() * 20) + 'px';
+      sea.appendChild(bubble);
+      setTimeout(() => {
+        bubble.style.animation = `bubbleRise ${0.8 + Math.random() * 0.6}s ease-out forwards`;
+      }, 100 + i * 80);
+      setTimeout(() => bubble.remove(), 1800);
+    }
+    
+    // 水花溅起
+    for (let i = 0; i < 2; i++) {
+      const splash = document.createElement('div');
+      splash.className = 'splash-ring';
+      splash.style.left = cx + 'px';
+      splash.style.top = cy + 'px';
+      splash.style.width = '30px';
+      splash.style.height = '15px';
+      sea.appendChild(splash);
+      setTimeout(() => {
+        splash.style.animation = `splashExpand 0.8s ease-out forwards`;
+      }, i * 150);
+      setTimeout(() => splash.remove(), 1200);
+    }
+    
+    // 其他瓶子沉入水中
+    sea.querySelectorAll('.sea-bottle').forEach(b => {
+      if (b !== el) {
+        b.style.animation = 'bottleSinkAway 0.8s ease-in forwards';
+        b.style.pointerEvents = 'none';
+      }
+    });
+    
+    // 被选中的瓶子捞起动画
+    el.style.pointerEvents = 'none';
+    el.querySelector('.sea-bottle-inner').style.animation = 'none';
+    el.style.transition = 'none';
+    el.style.animation = 'bottleLiftUp 1.2s ease-in-out forwards';
+    
+    // 动画结束后切到详情页
+    setTimeout(() => {
+      closePickOcean();
+      showPickedBottle(bottle);
+    }, 1100);
+  }
+
+  function showPickedBottle(b) {
+    const color = moodToColor(b.mood);
+    document.getElementById('pickedBottleVis').style.background = color;
+    document.getElementById('pickedBottleVis').style.boxShadow = `0 0 40px ${color}50`;
+    document.getElementById('pickedNickname').textContent = b.nickname;
+    document.getElementById('pickedContent').textContent = b.content;
+    document.getElementById('pickedHugs').textContent = b.hugs;
+    document.getElementById('hugBtn').classList.remove('hugged');
+    document.getElementById('hugBtn').innerHTML = ICONS.heart + ' 抱抱 TA';
+    document.getElementById('commentInputWrap').classList.remove('show');
+    hugged = false;
+    openSub('pick');
+  }
+
+  // 保留原来的 pickBottle 函数作为后备（不再直接使用）
+  function pickBottle() {
+    openPickOcean();
+  }
+
+  // ===== Hug =====
+  let hugged = false;
+  function hugBottle() {
+    if (hugged) { showToast('你已经抱过了'); return; }
+    hugged = true;
+    const el = document.getElementById('pickedHugs');
+    el.innerHTML = ICONS.heart + ' <span>' + (parseInt(el.querySelector('span').textContent) + 1) + '</span> 个抱抱';
+    document.getElementById('hugBtn').classList.add('hugged');
+    document.getElementById('hugBtn').innerHTML = ICONS.heart + ' 已抱抱';
+    showToast('你的拥抱已送达');
+  }
+
+  // ===== Comment =====
+  function toggleCommentInput() {
+    document.getElementById('commentInputWrap').classList.toggle('show');
+    document.getElementById('commentInput').focus();
+  }
+  function submitComment() {
+    const input = document.getElementById('commentInput');
+    const text = input.value.trim();
+    if (!text) return;
+    if (text.length > 100) { showToast('评论不超过100字哦'); return; }
+    const colors = ['rgba(232,201,122,0.4)', 'rgba(168,201,160,0.4)', 'rgba(154,176,196,0.4)', 'rgba(196,168,192,0.4)', 'rgba(212,160,144,0.4)'];
+    const names = ['匿名萤火', '匿名微风', '匿名晚霞', '匿名云朵', '匿名溪流'];
+    const c = colors[Math.floor(Math.random() * colors.length)];
+    const n = names[Math.floor(Math.random() * names.length)];
+    const html = `<div class="comment-item" style="animation:fadeIn .3s ease">
+      <div class="comment-avatar" style="background:${c}">匿</div>
+      <div class="comment-body">
+        <div class="comment-name">${n}</div>
+        <div class="comment-text">${text}</div>
+      </div>
+    </div>`;
+    document.getElementById('commentList').insertAdjacentHTML('beforeend', html);
+    input.value = '';
+    document.getElementById('commentInputWrap').classList.remove('show');
+    showToast('评论已发送');
+  }
+
+  // ===== Cabinet Tabs =====
+  function switchCabTab(el, idx) {
+    document.querySelectorAll('.cab-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('cabContent0').style.display = idx === 0 ? 'block' : 'none';
+    document.getElementById('cabContent1').style.display = idx === 1 ? 'block' : 'none';
+  }
+
+  // ===== Meditation Player =====
+  let isPlaying = false;
+  let progressInterval;
+  function openMedPlayer(name, icon, desc) {
+    document.getElementById('playerTitle').textContent = name;
+    document.getElementById('playerName').textContent = name;
+    document.getElementById('playerIcon').innerHTML = ICONS[icon] || ICONS.moon;
+    document.getElementById('playerDesc').textContent = desc;
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('currentTime').textContent = '00:00';
+    document.getElementById('playPauseBtn').innerHTML = ICONS.play;
+    isPlaying = false;
+    clearInterval(progressInterval);
+    openSub('player');
+  }
+  function togglePlay() {
+    isPlaying = !isPlaying;
+    document.getElementById('playPauseBtn').innerHTML = isPlaying ? ICONS.pause : ICONS.play;
+    if (isPlaying) {
+      let w = parseFloat(document.getElementById('progressFill').style.width) || 0;
+      progressInterval = setInterval(() => {
+        w += 0.2;
+        if (w >= 100) { w = 100; clearInterval(progressInterval); isPlaying = false; document.getElementById('playPauseBtn').innerHTML = ICONS.play; }
+        document.getElementById('progressFill').style.width = w + '%';
+        const totalSec = 900;
+        const cur = Math.floor(w / 100 * totalSec);
+        const m = String(Math.floor(cur / 60)).padStart(2, '0');
+        const s = String(cur % 60).padStart(2, '0');
+        document.getElementById('currentTime').textContent = m + ':' + s;
+      }, 100);
+    } else {
+      clearInterval(progressInterval);
+    }
+  }
+
+  // ===== Toast =====
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ===== Init =====
+  document.addEventListener('DOMContentLoaded', () => {
+    updateGreeting();
+    getHomeMood = initMoodSlider('moodTrack', 'moodThumb', 'moodBottle', 'moodLabel');
+  });
+</script>
+</body>
+</html>
